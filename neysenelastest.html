@@ -1,0 +1,970 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>neyse ne - playground</title>
+<style>
+  
+  :root {
+    color-scheme: dark;
+    --bg: #1a1a1a;
+    --panel: #252526;
+    --field: #333;
+    --line: #444;
+    --text: #fff;
+    --muted: #ccc;
+    --accent: #007acc;
+    --accent-hover: #005999;
+    --danger: #d9534f;
+    --danger-hover: #c9302c;
+    --canvas: #111;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+  html, body { height: 100%; }
+  body {
+    font-family: 'segoe ui', tahoma, geneva, verdana, sans-serif;
+    background: var(--bg); color: var(--text);
+    display: flex; overflow: hidden;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  #sidebar {
+    width: 280px; background: var(--panel); padding: 20px;
+    display: flex; flex-direction: column; gap: 16px;
+    box-shadow: 2px 0 10px rgba(0,0,0,.5); z-index: 10; overflow-y: auto;
+  }
+  h2 { font-size: 1.2rem; color: var(--accent); border-bottom: 2px solid var(--accent); padding-bottom: 5px; }
+  .group { display: flex; flex-direction: column; gap: 8px; }
+  label { font-size: .9rem; color: var(--muted); }
+
+  input[type=color], select {
+    width: 100%; padding: 8px; background: var(--field); border: 1px solid var(--line);
+    color: var(--text); border-radius: 4px; cursor: pointer;
+  }
+  input[type=color] { height: 40px; padding: 3px; }
+
+  input[type=range] {
+    width: 100%; padding: 0; background: transparent; border: none; cursor: pointer;
+    -webkit-appearance: none; appearance: none; height: 24px;
+  }
+  input[type=range]:focus { outline: none; }
+  input[type=range]::-webkit-slider-runnable-track {
+    width: 100%; height: 6px; background: var(--field); border-radius: 3px;
+    border: 1px solid var(--line);
+  }
+  input[type=range]::-moz-range-track {
+    width: 100%; height: 6px; background: var(--field); border-radius: 3px;
+    border: 1px solid var(--line);
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 16px; height: 16px; background: var(--accent); border-radius: 50%;
+    margin-top: -6px; border: 2px solid var(--text); transition: transform .1s, background .2s;
+    box-shadow: 0 0 6px rgba(0, 122, 204, 0.4);
+  }
+  input[type=range]::-moz-range-thumb {
+    width: 16px; height: 16px; background: var(--accent); border-radius: 50%;
+    border: 2px solid var(--text); transition: transform .1s, background .2s;
+    box-shadow: 0 0 6px rgba(0, 122, 204, 0.4);
+  }
+  input[type=range]:hover::-webkit-slider-thumb,
+  input[type=range]:active::-webkit-slider-thumb { transform: scale(1.2); background: var(--accent-hover); }
+  input[type=range]:hover::-moz-range-thumb,
+  input[type=range]:active::-moz-range-thumb { transform: scale(1.2); background: var(--accent-hover); }
+
+  .check { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+  .check input { width: 16px; height: 16px; accent-color: var(--accent); }
+
+  .row { display: flex; gap: 8px; }
+  button {
+    flex: 1; padding: 10px; background: var(--accent); color: #fff; border: none;
+    border-radius: 4px; cursor: pointer; font-weight: bold; font-family: inherit; transition: background .2s;
+  }
+  button:hover { background: var(--accent-hover); }
+  button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+  button.clear { background: var(--danger); }
+  button.clear:hover { background: var(--danger-hover); }
+  button.ghost { background: var(--field); }
+  button.ghost:hover { background: #3d3d3d; }
+
+  #hint { font-size: .75rem; color: #888; line-height: 1.5; }
+  .foot { margin-top: auto; padding-top: 10px; border-top: 1px solid var(--line); text-align: center; font-size: .85rem; color: #aaa; }
+  .foot b { color: #ff5c8a; }
+
+  .picker { position: relative; }
+  #color-btn { width: 100%; height: 40px; flex: none; border: 1px solid var(--line); text-shadow: 0 0 3px #000; }
+  #color-btn:hover { filter: brightness(1.15); }
+  #color { position: absolute; left: 0; bottom: 0; width: 1px; height: 1px; padding: 0; border: 0; opacity: 0; pointer-events: none; }
+  #palette { display: none; position: absolute; top: 46px; left: 0; right: 0; z-index: 20; flex-direction: column; gap: 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.6); }
+  #palette.open { display: flex; }
+  #palette small { color: #888; font-size: .75rem; }
+  #recent { display: flex; gap: 6px; min-height: 24px; flex-wrap: wrap; }
+  .sw { width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--line); padding: 0; flex: none; }
+  .sw:hover { border-color: #fff; }
+
+  #quick-colors { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; }
+  .qc {
+    width: 100%; aspect-ratio: 1; border-radius: 4px; border: 2px solid transparent;
+    padding: 0; flex: none; cursor: pointer; transition: transform .1s, border-color .1s;
+  }
+  .qc:hover { transform: scale(1.15); border-color: #fff; }
+  .qc.active { border-color: #fff; box-shadow: 0 0 0 2px var(--accent); }
+
+  #graffiti-opts { display: none; flex-direction: column; gap: 8px; padding: 8px; background: #2f2f2f; border-radius: 6px; border: 1px solid var(--line); }
+  #graffiti-opts.show { display: flex; }
+  .tiny-label { font-size: .75rem; color: #999; }
+
+  .opts { display: none; flex-direction: column; gap: 8px; padding: 8px; background: #2f2f2f; border-radius: 6px; border: 1px solid var(--line); }
+  .opts.show { display: flex; }
+
+  #stage.grid::after {
+    content: ''; position: absolute; inset: 0; pointer-events: none;
+    background-image: linear-gradient(rgba(255,255,255,.07) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.07) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  #toggle { position: absolute; top: 10px; left: 10px; z-index: 5; width: 34px; height: 34px; flex: none; padding: 0; background: rgba(37,37,38,.9); border: 1px solid var(--line); }
+  body.collapsed #sidebar { display: none; }
+  #stage { flex: 1; position: relative; background: var(--canvas); min-width: 0; }
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
+  #fx { cursor: crosshair; }
+  #stats {
+    position: absolute; bottom: 10px; right: 10px; background: rgba(0,0,0,.7);
+    padding: 8px 12px; border-radius: 4px; font-size: .8rem; pointer-events: none;
+  }
+
+  #credit {
+    position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%);
+    z-index: 3; color: rgba(204,220,231,.62); font-size: .8rem;
+    letter-spacing: .16em; white-space: nowrap; pointer-events: none;
+    text-shadow: 0 1px 3px rgba(0,0,0,.8);
+  }
+  #credit b { color: #ff5c8a; }
+
+  @media (max-width: 700px) {
+    body { flex-direction: column; }
+    #sidebar { width: 100%; max-height: 45%; padding: 12px; gap: 10px; }
+    #hint { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div id="sidebar">
+  <h2>playground</h2>
+
+  <div class="group">
+    <label for="mode">mod seçin:</label>
+    <select id="mode">
+      <option value="draw">bokeser çiz</option>
+      <option value="spray">sprey sıkıyoz</option>
+      <option value="erase">silgi</option>
+      <option value="square">kare bas</option>
+      <option value="circle">daire bas</option>
+      <option value="heart">kalp bas</option>
+      <option value="star">yıldız bas</option>
+      <option value="line">düz çizgi</option>
+      <option value="rect">dikdörtgen</option>
+      <option value="ellipse">elips</option>
+      <option value="fill">boya kovası</option>
+      <option value="pick">pipet</option>
+      <option value="graffiti">graffiti</option>
+      <option value="neon">neon ışık</option>
+      <option value="fireworks">havai fişek</option>
+      <option value="particles">parçacık</option>
+      <option value="balls">poklu simulator</option>
+    </select>
+  </div>
+
+  <div class="group">
+    <label>renk:</label>
+    <div class="picker">
+      <button id="color-btn" style="background:#00ffcc">renk seç ▾</button>
+      <input type="color" id="color" value="#00ffcc" tabindex="-1">
+      <div id="palette">
+        <small>son kullanılanlar</small>
+        <div id="recent"><small>henüz renk yok</small></div>
+        <button id="custom-color" class="ghost">başka renk seç…</button>
+      </div>
+    </div>
+    
+    <label class="tiny-label">hızlı renk:</label>
+    <div id="quick-colors"></div>
+    
+    <label class="check"><input type="checkbox" id="rainbow"> gökkuşağı modu</label>
+    <label>arka plan:</label>
+    <input type="color" id="bg-color" value="#111111">
+  </div>
+
+  <div class="group">
+    <label for="size">boyut ve çap: <span id="size-val">5</span></label>
+    <input type="range" id="size" min="1" max="50" value="5">
+  </div>
+
+  <div class="group">
+    <label for="opacity">saydamlık: <span id="opacity-val">100</span>%</label>
+    <input type="range" id="opacity" min="5" max="100" value="100">
+    <label for="sym">simetri:</label>
+    <select id="sym">
+      <option value="1">kapalı</option>
+      <option value="2">2 yön</option>
+      <option value="3">3 yön</option>
+      <option value="4">4 yön</option>
+      <option value="6">6 yön</option>
+      <option value="8">8 yön</option>
+      <option value="12">12 yön</option>
+    </select>
+    <label class="check"><input type="checkbox" id="mirror"> ayna (mandala)</label>
+    <label class="check"><input type="checkbox" id="grid"> ızgara göster</label>
+  </div>
+
+  <div id="fill-opts" class="opts">
+    <label class="check"><input type="checkbox" id="shape-fill"> içi dolu</label>
+  </div>
+
+  <div id="fw-opts" class="opts">
+    <label class="tiny-label">patlama şekli:</label>
+    <select id="fw-type">
+      <option value="sphere">küre</option>
+      <option value="ring">halka</option>
+      <option value="heart">kalp</option>
+      <option value="mix">karışık</option>
+    </select>
+    <label class="check"><input type="checkbox" id="fw-auto"> otomatik gösteri</label>
+  </div>
+
+  <div id="graffiti-opts">
+    <label class="check"><input type="checkbox" id="g-drip" checked> damla akıt</label>
+    <label class="check"><input type="checkbox" id="g-shadow" checked> gölge/parıltı</label>
+    <label class="check"><input type="checkbox" id="g-splatter" checked> sıçratma</label>
+    <label class="tiny-label">yoğunluk: <span id="g-density-val">normal</span></label>
+    <input type="range" id="g-density" min="1" max="3" value="2" step="1">
+  </div>
+
+  <div class="row">
+    <button id="undo-btn" class="ghost">geri al</button>
+    <button id="redo-btn" class="ghost">ileri al</button>
+    <button id="save-btn" class="ghost">png kaydet</button>
+  </div>
+  <div class="row">
+    <button id="clear-btn" class="clear">bune bok gibi olmuş sil</button>
+  </div>
+
+  <p id="hint">kısayollar: b çiz, s sprey, g graffiti, n neon, e silgi, t çizgi, r dikdörtgen, o elips, k kova, i pipet, f havai fişek, p parçacık, l top, c temizle. 1-9 ve 0 boyut, [ ] ince/kalın. ctrl+z geri, ctrl+y ileri.</p>
+</div>
+
+<div id="stage">
+  <canvas id="paint"></canvas>
+  <canvas id="fx"></canvas>
+  <button id="toggle" title="paneli gizle/göster">◀</button>
+  <div id="credit">by <b>kaan akcan</b> ♥</div>
+  <div id="stats">ne çizdin kaç tane: 0</div>
+</div>
+
+<script>
+  
+  const paint = document.getElementById('paint');
+  const fx = document.getElementById('fx');
+  const pctx = paint.getContext('2d', { willReadFrequently: true });
+  const fctx = fx.getContext('2d');
+
+  const modeSelect = document.getElementById('mode');
+  const colorInput = document.getElementById('color');
+  const rainbowInput = document.getElementById('rainbow');
+  const bgColorInput = document.getElementById('bg-color');
+  const sizeInput = document.getElementById('size');
+  const sizeVal = document.getElementById('size-val');
+  const statsEl = document.getElementById('stats');
+  const SHAPES = ['square', 'circle', 'heart', 'star'];
+  const DRAGS = ['line', 'rect', 'ellipse'];
+  const PAINTERS = ['draw', 'spray', 'erase', 'graffiti', 'neon', 'fill', ...DRAGS, ...SHAPES];
+  const MAX_BALLS = 300;
+  const MAX_PARTICLES = 300;
+  const MAX_UNDO = 20;
+  let drawing = false;
+  let lastX = 0, lastY = 0;
+  let hue = 0;
+  let strokeCount = 0;
+  let particles = [];
+  let balls = [];
+  let sparks = [];
+  let rockets = [];
+  let drips = [];
+  let undoStack = [];
+  let redoStack = [];
+  let startX = 0, startY = 0, dragColor = '#fff';
+  let viewW = 0, viewH = 0; // css boyutu, her karede sormayalım
+
+  const QUICK_COLORS = [
+    '#ff0044', '#ff6600', '#ffcc00', '#00ff88',
+    '#00ccff', '#0066ff', '#9933ff', '#ff33cc',
+    '#ffffff', '#cccccc', '#888888', '#000000',
+    '#00ffcc', '#ff5c8a', '#7fff00', '#ffaa00'
+  ];
+  const quickEl = document.getElementById('quick-colors');
+  QUICK_COLORS.forEach(c => {
+    const b = document.createElement('button');
+    b.className = 'qc';
+    b.style.background = c;
+    b.title = c;
+    b.dataset.color = c;
+    b.addEventListener('click', () => { setColor(c); });
+    quickEl.appendChild(b);
+  });
+
+  const gDrip = document.getElementById('g-drip');
+  const gShadow = document.getElementById('g-shadow');
+  const gSplatter = document.getElementById('g-splatter');
+  const gDensity = document.getElementById('g-density');
+  const gDensityVal = document.getElementById('g-density-val');
+  const graffitiOpts = document.getElementById('graffiti-opts');
+  const fwOpts = document.getElementById('fw-opts');
+  const fillOpts = document.getElementById('fill-opts');
+  const fwType = document.getElementById('fw-type');
+  const fwAuto = document.getElementById('fw-auto');
+  const shapeFill = document.getElementById('shape-fill');
+  const symSelect = document.getElementById('sym');
+  const mirrorInput = document.getElementById('mirror');
+  const opacityInput = document.getElementById('opacity');
+
+  function syncModeUI() {
+    graffitiOpts.classList.toggle('show', modeSelect.value === 'graffiti');
+    fwOpts.classList.toggle('show', modeSelect.value === 'fireworks');
+    fillOpts.classList.toggle('show', ['rect', 'ellipse'].includes(modeSelect.value));
+  }
+  modeSelect.addEventListener('change', syncModeUI);
+  syncModeUI(); // başlangıçta çalıştır
+
+  gDensity.addEventListener('input', () => {
+    const labels = ['az', 'normal', 'bol'];
+    gDensityVal.textContent = labels[parseInt(gDensity.value) - 1];
+  });
+
+  bgColorInput.addEventListener('input', e => {
+    document.documentElement.style.setProperty('--canvas', e.target.value);
+  });
+
+  function resizeCanvas() {
+    const rect = fx.parentElement.getBoundingClientRect();
+    const w = Math.max(1, Math.round(rect.width));
+    const h = Math.max(1, Math.round(rect.height));
+    viewW = w; viewH = h;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    if (!w || !h) return;
+    const keep = document.createElement('canvas');
+    keep.width = paint.width;
+    keep.height = paint.height;
+    if (paint.width && paint.height) keep.getContext('2d').drawImage(paint, 0, 0);
+
+    const oldW = paint.width, oldH = paint.height;
+    paint.width = fx.width = Math.round(w * dpr);
+    paint.height = fx.height = Math.round(h * dpr);
+    
+    pctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    fctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    
+    if (keep.width && keep.height && oldW && oldH) {
+      pctx.drawImage(keep, 0, 0, oldW, oldH, 0, 0, w, h);
+    }
+    undoStack = []; // boyut değişince geri alma geçmişini sıfırla
+  }
+  new ResizeObserver(resizeCanvas).observe(fx.parentElement);
+  resizeCanvas();
+
+  function currentColor() {
+    if (rainbowInput.checked) {
+      hue = (hue + 3) % 360;
+      return `hsl(${hue}, 100%, 60%)`;
+    }
+    return colorInput.value;
+  }
+
+  function pushUndo() {
+    if (!paint.width) return;
+    redoStack = [];
+    undoStack.push(pctx.getImageData(0, 0, paint.width, paint.height));
+    if (undoStack.length > MAX_UNDO) undoStack.shift();
+  }
+
+  function undo() {
+    drips = []; // akan damlalar geri almayı bozmasın
+    const snap = undoStack.pop();
+    if (!snap) return;
+    redoStack.push(pctx.getImageData(0, 0, paint.width, paint.height));
+    pctx.putImageData(snap, 0, 0);
+  }
+
+  function redo() {
+    const snap = redoStack.pop();
+    if (!snap) return;
+    undoStack.push(pctx.getImageData(0, 0, paint.width, paint.height));
+    pctx.putImageData(snap, 0, 0);
+  }
+
+  function pos(e) {
+    const r = fx.getBoundingClientRect();
+    return [e.clientX - r.left, e.clientY - r.top];
+  }
+
+  sizeInput.addEventListener('input', e => { sizeVal.textContent = e.target.value; });
+
+  fx.addEventListener('contextmenu', e => e.preventDefault());
+
+  fx.addEventListener('pointerdown', e => {
+    if (e.button === 2) { balls = []; return; } // sağ tık topları sıfırlar
+    fx.setPointerCapture(e.pointerId);
+    drawing = true;
+    [lastX, lastY] = pos(e);
+    const m = modeSelect.value;
+    
+    if (PAINTERS.includes(m)) { pushUndo(); strokeCount++; }
+    startX = lastX; startY = lastY;
+    if (DRAGS.includes(m)) dragColor = currentColor();
+    if (!rainbowInput.checked && m !== 'erase') addRecent(colorInput.value);
+    
+    interact(e, true);
+  });
+
+  fx.addEventListener('pointermove', e => { if (drawing) interact(e, false); });
+  const stop = () => { drawing = false; };
+  fx.addEventListener('pointerup', stop);
+  fx.addEventListener('pointercancel', stop);
+  function interact(e, first) {
+    const mode = modeSelect.value;
+    const n = parseInt(symSelect.value);
+    const mirror = mirrorInput.checked;
+    const symModes = ['draw', 'neon', 'spray', 'erase', ...SHAPES];
+    pctx.save();
+    pctx.globalAlpha = parseInt(opacityInput.value) / 100;
+    if ((n > 1 || mirror) && symModes.includes(mode)) {
+      const lx = lastX, ly = lastY, cx = viewW / 2, cy = viewH / 2;
+      for (let k = 0; k < n * (mirror ? 2 : 1); k++) {
+        lastX = lx; lastY = ly;
+        pctx.save();
+        pctx.translate(cx, cy);
+        pctx.rotate((k % n) * Math.PI * 2 / n);
+        if (k >= n) pctx.scale(-1, 1);
+        pctx.translate(-cx, -cy);
+        interactBase(e, first);
+        pctx.restore();
+      }
+    } else {
+      interactBase(e, first);
+    }
+    pctx.restore();
+  }
+
+  function interactBase(e, first) {
+    const [x, y] = pos(e);
+    const size = parseInt(sizeInput.value);
+    const mode = modeSelect.value;
+
+    if (DRAGS.includes(mode)) { dragShape(mode, x, y, size); return; }
+    if (mode === 'fill') { if (first) floodFill(x, y); return; }
+    if (mode === 'pick') { pickColor(x, y); return; }
+    if (SHAPES.includes(mode)) {
+      if (first || Math.hypot(x - lastX, y - lastY) > size * 2) {
+        stamp(mode, x, y, size * 3);
+        lastX = x; lastY = y;
+      }
+      return;
+    }
+    if (mode === 'draw' || mode === 'erase') {
+      pctx.save();
+      pctx.globalCompositeOperation = mode === 'erase' ? 'destination-out' : 'source-over';
+      pctx.strokeStyle = pctx.fillStyle = currentColor();
+      pctx.lineWidth = size * 2;
+      pctx.lineCap = pctx.lineJoin = 'round';
+      pctx.beginPath();
+      pctx.moveTo(lastX, lastY);
+      pctx.lineTo(x, y);
+      pctx.stroke();
+      if (first) { pctx.beginPath(); pctx.arc(x, y, size, 0, Math.PI * 2); pctx.fill(); }
+      pctx.restore();
+    } 
+    else if (mode === 'spray') {
+      pctx.fillStyle = currentColor();
+      const dist = Math.hypot(x - lastX, y - lastY);
+      const steps = Math.max(1, Math.floor(dist / 5));
+      for (let s = 0; s <= steps; s++) {
+        const ix = lastX + (x - lastX) * (s / steps);
+        const iy = lastY + (y - lastY) * (s / steps);
+        for (let i = 0; i < 20 + size; i++) {
+          const a = Math.random() * Math.PI * 2;
+          const d = Math.sqrt(Math.random()) * size * 2.5;
+          pctx.fillRect(ix + Math.cos(a) * d, iy + Math.sin(a) * d, 1.5, 1.5);
+        }
+      }
+    } 
+    else if (mode === 'graffiti') {
+      drawGraffiti(lastX, lastY, x, y, size, first);
+    } 
+    else if (mode === 'neon') {
+      const col = currentColor();
+      pctx.save();
+      pctx.lineCap = pctx.lineJoin = 'round';
+      pctx.strokeStyle = col;
+      pctx.shadowColor = col;
+      pctx.shadowBlur = size * 3 + 12;
+      pctx.lineWidth = size + 2;
+      pctx.beginPath(); pctx.moveTo(lastX, lastY); pctx.lineTo(x, y); pctx.stroke();
+      pctx.restore();
+    } 
+    else if (mode === 'fireworks') {
+      if (first) rockets.push(new Rocket(x, y, currentColor(), size));
+    } 
+    else if (mode === 'particles') {
+      for (let i = 0; i < 5; i++) {
+        particles.push(new Particle(x, y, currentColor(), size));
+        if (particles.length > MAX_PARTICLES) particles.shift();
+      }
+    } 
+    else if (mode === 'balls') {
+      balls.push(new Ball(x, y, currentColor(), size));
+      if (balls.length > MAX_BALLS) balls.shift();
+    }
+    
+    lastX = x; lastY = y;
+  }
+
+  function dragShape(mode, x, y, size) {
+    const snap = undoStack[undoStack.length - 1];
+    if (snap) pctx.putImageData(snap, 0, 0);
+    pctx.save();
+    pctx.strokeStyle = pctx.fillStyle = dragColor;
+    pctx.lineWidth = size * 2;
+    pctx.lineCap = pctx.lineJoin = 'round';
+    pctx.beginPath();
+    if (mode === 'line') { pctx.moveTo(startX, startY); pctx.lineTo(x, y); }
+    else if (mode === 'rect') pctx.rect(startX, startY, x - startX, y - startY);
+    else pctx.ellipse((startX + x) / 2, (startY + y) / 2, Math.abs(x - startX) / 2, Math.abs(y - startY) / 2, 0, 0, Math.PI * 2);
+    (shapeFill.checked && mode !== 'line') ? pctx.fill() : pctx.stroke();
+    pctx.restore();
+  }
+  function floodFill(cx, cy) {
+    const W = paint.width, H = paint.height, dpr = W / viewW;
+    const sx = Math.floor(cx * dpr), sy = Math.floor(cy * dpr);
+    if (sx < 0 || sy < 0 || sx >= W || sy >= H) return;
+    const img = pctx.getImageData(0, 0, W, H), d = img.data;
+    const tmp = document.createElement('canvas').getContext('2d');
+    tmp.fillStyle = currentColor(); tmp.fillRect(0, 0, 1, 1);
+    const [fr, fg, fb] = tmp.getImageData(0, 0, 1, 1).data;
+    const i0 = (sy * W + sx) * 4;
+    const tr = d[i0], tg = d[i0 + 1], tb = d[i0 + 2], ta = d[i0 + 3];
+    if (tr === fr && tg === fg && tb === fb && ta === 255) return;
+    const match = i => Math.abs(d[i] - tr) + Math.abs(d[i + 1] - tg) + Math.abs(d[i + 2] - tb) + Math.abs(d[i + 3] - ta) <= 60;
+    const seen = new Uint8Array(W * H);
+    const stack = [sy * W + sx];
+    while (stack.length) {
+      const q = stack.pop();
+      if (seen[q]) continue;
+      seen[q] = 1;
+      const i = q * 4;
+      if (!match(i)) continue;
+      d[i] = fr; d[i + 1] = fg; d[i + 2] = fb; d[i + 3] = 255;
+      const px = q % W, py = (q / W) | 0;
+      if (px > 0) stack.push(q - 1);
+      if (px < W - 1) stack.push(q + 1);
+      if (py > 0) stack.push(q - W);
+      if (py < H - 1) stack.push(q + W);
+    }
+    pctx.putImageData(img, 0, 0);
+  }
+  function pickColor(x, y) {
+    const dpr = paint.width / viewW;
+    const d = pctx.getImageData(Math.floor(x * dpr), Math.floor(y * dpr), 1, 1).data;
+    const hex = d[3] < 10 ? bgColorInput.value
+      : '#' + [d[0], d[1], d[2]].map(v => v.toString(16).padStart(2, '0')).join('');
+    setColor(hex);
+  }
+
+  document.getElementById('redo-btn').addEventListener('click', redo);
+  document.getElementById('grid').addEventListener('change', e => {
+    document.getElementById('stage').classList.toggle('grid', e.target.checked);
+  });
+  opacityInput.addEventListener('input', () => { document.getElementById('opacity-val').textContent = opacityInput.value; });
+  document.querySelectorAll('select, input[type=range], input[type=checkbox]').forEach(el => {
+    el.addEventListener('change', () => el.blur());
+  });
+
+  function drawGraffiti(x0, y0, x1, y1, size, first) {
+    const col = currentColor();
+    const density = parseInt(gDensity.value);
+    const dist = Math.hypot(x1 - x0, y1 - y0);
+    const steps = Math.max(1, Math.floor(dist / 3));
+    const baseR = size * 2.2;
+    pctx.save();
+    if (gShadow.checked) {
+      pctx.shadowColor = col;
+      pctx.shadowBlur = size * 2.5 + 8;
+    }
+    pctx.globalAlpha = 0.18;
+    for (let s = 0; s <= steps; s++) {
+      const t = s / steps;
+      const ix = x0 + (x1 - x0) * t;
+      const iy = y0 + (y1 - y0) * t;
+      const r = baseR * (0.85 + Math.random() * 0.3);
+      const grad = pctx.createRadialGradient(ix, iy, 0, ix, iy, r);
+      grad.addColorStop(0, col);
+      grad.addColorStop(0.6, col);
+      grad.addColorStop(1, 'transparent');
+      pctx.fillStyle = grad;
+      pctx.beginPath();
+      pctx.arc(ix, iy, r, 0, Math.PI * 2);
+      pctx.fill();
+    }
+    pctx.restore();
+    pctx.save();
+    if (gShadow.checked) {
+      pctx.shadowColor = col;
+      pctx.shadowBlur = size * 1.2 + 4;
+    }
+    pctx.fillStyle = col;
+    const centerDots = (8 + size * 2) * density;
+    for (let s = 0; s <= steps; s++) {
+      const t = s / steps;
+      const ix = x0 + (x1 - x0) * t;
+      const iy = y0 + (y1 - y0) * t;
+      for (let i = 0; i < centerDots; i++) {
+        const a = Math.random() * Math.PI * 2;
+        const d = Math.sqrt(Math.random()) * size * 0.9;
+        pctx.globalAlpha = 0.55 + Math.random() * 0.45;
+        pctx.beginPath();
+        pctx.arc(ix + Math.cos(a) * d, iy + Math.sin(a) * d, 0.6 + Math.random() * size * 0.18, 0, Math.PI * 2);
+        pctx.fill();
+      }
+    }
+    pctx.restore();
+    if (gSplatter.checked) {
+      pctx.save();
+      pctx.fillStyle = col;
+      const splats = Math.floor((2 + size * 0.4) * density);
+      for (let s = 0; s <= steps; s++) {
+        const t = s / steps;
+        const ix = x0 + (x1 - x0) * t;
+        const iy = y0 + (y1 - y0) * t;
+        for (let i = 0; i < splats; i++) {
+          const a = Math.random() * Math.PI * 2;
+          const d = baseR * (0.7 + Math.random() * 1.4);
+          const sx = ix + Math.cos(a) * d;
+          const sy = iy + Math.sin(a) * d;
+          const sr = 0.5 + Math.random() * size * 0.25;
+          pctx.globalAlpha = 0.3 + Math.random() * 0.6;
+          pctx.beginPath();
+          pctx.arc(sx, sy, sr, 0, Math.PI * 2);
+          pctx.fill();
+        }
+      }
+      pctx.restore();
+    }
+    if (gDrip.checked) {
+      const dripChance = (0.03 + size * 0.001) * density;
+      for (let s = 0; s <= steps; s += 2) {
+        if (Math.random() < dripChance) {
+          const t = s / steps;
+          const ix = x0 + (x1 - x0) * t + (Math.random() - 0.5) * size;
+          const iy = y0 + (y1 - y0) * t;
+          drips.push(new Drip(ix, iy, col, size));
+        }
+      }
+    }
+    if (first) {
+      pctx.save();
+      pctx.fillStyle = col;
+      pctx.globalAlpha = 0.6;
+      pctx.beginPath();
+      pctx.arc(x0, y0, size * 1.1, 0, Math.PI * 2);
+      pctx.fill();
+      pctx.restore();
+    }
+  }
+
+  class Particle {
+    constructor(x, y, color, size) {
+      this.x = x; this.y = y; this.color = color;
+      this.size = Math.random() * size + 1;
+      this.vx = (Math.random() - 0.5) * 6;
+      this.vy = (Math.random() - 0.5) * 6;
+      this.alpha = 1;
+    }
+    update() {
+      this.x += this.vx; this.y += this.vy; this.vy += 0.03; this.alpha -= 0.015;
+    }
+    draw() {
+      fctx.globalAlpha = Math.max(0, this.alpha);
+      fctx.fillStyle = this.color;
+      fctx.beginPath(); fctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); fctx.fill();
+      fctx.globalAlpha = 1;
+    }
+  }
+
+  class Ball {
+    constructor(x, y, color, radius) {
+      this.x = x; this.y = y; this.radius = radius; this.color = color;
+      this.vx = (Math.random() - 0.5) * 6;
+      this.vy = (Math.random() - 0.5) * 4;
+      this.gravity = 0.3; this.bounce = 0.75;
+    }
+    update() {
+      const w = viewW, h = viewH;
+
+      this.vy += this.gravity;
+      this.x += this.vx; this.y += this.vy;
+      
+      if (this.y + this.radius > h) {
+        this.y = h - this.radius;
+        this.vy *= -this.bounce; this.vx *= 0.98;
+        if (Math.abs(this.vy) < 0.6) this.vy = 0;
+      }
+      if (this.y - this.radius < 0) { this.y = this.radius; this.vy *= -this.bounce; }
+      if (this.x + this.radius > w) { this.x = w - this.radius; this.vx *= -1; }
+      if (this.x - this.radius < 0) { this.x = this.radius; this.vx *= -1; }
+    }
+    draw() {
+      fctx.fillStyle = this.color;
+      fctx.beginPath(); fctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2); fctx.fill();
+    }
+  }
+
+  class Drip {
+    constructor(x, y, color, size) {
+      this.x = x; this.y = y; this.color = color;
+      this.w = Math.max(1, size * 0.28);
+      this.v = 1.2 + Math.random() * 1.8;
+      this.life = 80 + Math.random() * 140;
+    }
+    get dead() { return this.life <= 0 || this.v < 0.12; }
+    update() {
+      pctx.strokeStyle = this.color;
+      pctx.lineWidth = this.w;
+      pctx.lineCap = 'round';
+      pctx.beginPath();
+      pctx.moveTo(this.x, this.y);
+      this.y += this.v;
+      pctx.lineTo(this.x, this.y);
+      pctx.stroke();
+      this.v *= 0.985; this.w *= 0.997; this.life--;
+    }
+  }
+
+  class Rocket {
+    constructor(x, y, color, size) {
+      this.x = x; 
+      this.y = viewH; // ekranın tam altından çıkar
+      this.ty = y;
+      this.color = color; this.size = size; this.vy = -10;
+    }
+    update() {
+      this.y += this.vy;
+      if (this.y <= this.ty) { // hedefe ulaştı mı?
+        explode(this.x, this.ty, this.color, this.size);
+        return true;
+      }
+      return false;
+    }
+    draw() {
+      fctx.fillStyle = '#fff';
+      fctx.beginPath(); fctx.arc(this.x, this.y, 2.5, 0, Math.PI * 2); fctx.fill();
+    }
+  }
+
+  class Spark {
+    constructor(x, y, angle, speed, color) {
+      this.x = x; this.y = y; this.color = color;
+      this.vx = Math.cos(angle) * speed;
+      this.vy = Math.sin(angle) * speed;
+      this.alpha = 1;
+    }
+    update() {
+      this.vx *= 0.985; this.vy = this.vy * 0.985 + 0.05;
+      this.x += this.vx; this.y += this.vy; this.alpha -= 0.012;
+    }
+    draw() {
+      fctx.globalAlpha = Math.max(0, this.alpha);
+      fctx.fillStyle = this.color;
+      fctx.beginPath(); fctx.arc(this.x, this.y, 1.8, 0, Math.PI * 2); fctx.fill();
+      fctx.globalAlpha = 1;
+    }
+  }
+
+  function explode(x, y, color, size) {
+    const n = 60 + size * 2;
+    const rb = rainbowInput.checked || fwAuto.checked;
+    let type = fwType.value;
+    if (type === 'mix') type = ['sphere', 'ring', 'heart'][Math.floor(Math.random() * 3)];
+    const base = 3 + size * 0.15;
+    for (let i = 0; i < n; i++) {
+      const c = rb ? `hsl(${Math.random() * 360}, 100%, 60%)` : (Math.random() < 0.2 ? '#fff' : color);
+      if (type === 'ring') {
+        sparks.push(new Spark(x, y, i / n * Math.PI * 2, base * 0.8, c));
+      } else if (type === 'heart') {
+        const t = i / n * Math.PI * 2;
+        const hx = 16 * Math.pow(Math.sin(t), 3);
+        const hy = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t));
+        sparks.push(new Spark(x, y, Math.atan2(hy, hx), Math.hypot(hx, hy) / 16 * base * 0.9, c));
+      } else {
+        sparks.push(new Spark(x, y, Math.random() * Math.PI * 2, 1.5 + Math.random() * base, c));
+      }
+    }
+    if (sparks.length > 1500) sparks.splice(0, sparks.length - 1500);
+  }
+
+  function animate() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const cw = fx.width / dpr;
+    const ch = fx.height / dpr;
+    fctx.save();
+    fctx.globalCompositeOperation = 'destination-out';
+    fctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+    fctx.fillRect(0, 0, cw, ch);
+    fctx.restore();
+    particles = particles.filter(p => p.alpha > 0);
+    for (const p of particles) { p.update(); p.draw(); }
+    for (const b of balls) { b.update(); b.draw(); }
+    rockets = rockets.filter(r => { 
+      const done = r.update(); 
+      if (!done) r.draw(); 
+      return !done; 
+    });
+    if (fwAuto.checked && Math.random() < 0.04) {
+      rockets.push(new Rocket(viewW * (0.1 + Math.random() * 0.8), viewH * (0.1 + Math.random() * 0.45),
+        `hsl(${Math.random() * 360}, 100%, 60%)`, 6 + Math.floor(Math.random() * 14)));
+    }
+    sparks = sparks.filter(s => s.alpha > 0);
+    for (const s of sparks) { s.update(); s.draw(); }
+    for (const d of drips) d.update();
+    drips = drips.filter(d => !d.dead);
+    const m = modeSelect.value;
+    const live = m === 'particles' ? particles.length
+               : m === 'balls' ? balls.length
+               : m === 'fireworks' ? rockets.length + sparks.length
+               : null;
+    statsEl.textContent = live === null ? 'ne çizdin kaç tane: ' + strokeCount : 'aktif nesne: ' + live;
+
+    requestAnimationFrame(animate);
+  }
+
+  document.getElementById('clear-btn').addEventListener('click', () => {
+    pushUndo();
+    pctx.clearRect(0, 0, paint.width, paint.height);
+    fctx.clearRect(0, 0, fx.width, fx.height);
+    particles = []; balls = []; sparks = []; rockets = []; drips = [];
+    strokeCount = 0;
+  });
+
+  document.getElementById('undo-btn').addEventListener('click', undo);
+
+  document.getElementById('save-btn').addEventListener('click', () => {
+    const out = document.createElement('canvas');
+    out.width = paint.width; out.height = paint.height;
+    const o = out.getContext('2d');
+    const currentBg = getComputedStyle(document.documentElement).getPropertyValue('--canvas').trim() || '#111';
+    o.fillStyle = currentBg;
+    o.fillRect(0, 0, out.width, out.height);
+    o.drawImage(paint, 0, 0);
+    o.drawImage(fx, 0, 0);
+    const a = document.createElement('a');
+    a.download = 'neyse-ne.png';
+    a.href = out.toDataURL('image/png');
+    a.click();
+  });
+
+  function stamp(type, x, y, r) {
+    pctx.fillStyle = currentColor();
+    pctx.beginPath();
+    if (type === 'square') {
+      pctx.rect(x - r, y - r, r * 2, r * 2);
+    } else if (type === 'circle') {
+      pctx.arc(x, y, r, 0, Math.PI * 2);
+    } else if (type === 'heart') {
+      for (let t = 0; t <= Math.PI * 2; t += 0.05) {
+        const hx = 16 * Math.pow(Math.sin(t), 3);
+        const hy = 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t);
+        const px = x + hx * r / 17, py = y - hy * r / 17;
+        t === 0 ? pctx.moveTo(px, py) : pctx.lineTo(px, py);
+      }
+    } else {
+      for (let i = 0; i < 10; i++) {
+        const rad = i % 2 ? r * 0.45 : r;
+        const a = -Math.PI / 2 + i * Math.PI / 5;
+        const px = x + Math.cos(a) * rad, py = y + Math.sin(a) * rad;
+        i === 0 ? pctx.moveTo(px, py) : pctx.lineTo(px, py);
+      }
+    }
+    pctx.closePath();
+    pctx.fill();
+  }
+
+  const colorBtn = document.getElementById('color-btn');
+  const palette = document.getElementById('palette');
+  
+  function setColor(c) {
+    colorInput.value = c;
+    colorBtn.style.background = c;
+    rainbowInput.checked = false;
+    document.querySelectorAll('.qc').forEach(b => {
+      b.classList.toggle('active', b.dataset.color.toLowerCase() === c.toLowerCase());
+    });
+  }
+  
+  function closePalette() { palette.classList.remove('open'); }
+  
+  colorBtn.addEventListener('click', e => { e.stopPropagation(); palette.classList.toggle('open'); });
+  palette.addEventListener('click', e => e.stopPropagation());
+  document.addEventListener('click', closePalette);
+  document.getElementById('custom-color').addEventListener('click', () => colorInput.click());
+  colorInput.addEventListener('input', () => setColor(colorInput.value));
+  colorInput.addEventListener('change', () => addRecent(colorInput.value));
+
+  let recentColors = [];
+  const recentEl = document.getElementById('recent');
+  
+  function addRecent(c) {
+    if (recentColors[0] === c) return;
+    recentColors = [c, ...recentColors.filter(x => x !== c)].slice(0, 7);
+    recentEl.innerHTML = '';
+    for (const col of recentColors) {
+      const b = document.createElement('button');
+      b.className = 'sw';
+      b.style.background = col;
+      b.title = col;
+      b.addEventListener('click', () => { setColor(col); closePalette(); });
+      recentEl.appendChild(b);
+    }
+  }
+
+  setColor('#00ffcc'); // varsayılan renk
+
+  const toggleBtn = document.getElementById('toggle');
+  toggleBtn.addEventListener('click', () => {
+    const hidden = document.body.classList.toggle('collapsed');
+    toggleBtn.textContent = hidden ? '▶' : '◀';
+  });
+
+  function setSize(n) {
+    sizeInput.value = n;
+    sizeVal.textContent = n;
+  }
+
+  const KEYS = { b: 'draw', s: 'spray', e: 'erase', g: 'graffiti', n: 'neon', f: 'fireworks', p: 'particles', l: 'balls', t: 'line', r: 'rect', o: 'ellipse', k: 'fill', i: 'pick' };
+  window.addEventListener('keydown', e => {
+    if (['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+    const k = e.key.toLowerCase();
+    
+    if (k === 'escape') closePalette();
+    if ((e.ctrlKey || e.metaKey) && k === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
+    if ((e.ctrlKey || e.metaKey) && k === 'y') { e.preventDefault(); redo(); return; }
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+    if (k === '[' || k === ']') { setSize(Math.min(50, Math.max(1, parseInt(sizeInput.value) + (k === ']' ? 1 : -1)))); return; }
+    if (KEYS[k]) { e.preventDefault(); modeSelect.value = KEYS[k]; syncModeUI(); }
+    else if (k === 'c') { e.preventDefault(); document.getElementById('clear-btn').click(); }
+    else if (/^[0-9]$/.test(k)) { e.preventDefault(); setSize(k === '0' ? 10 : parseInt(k)); }
+  });
+  animate();
+</script>
+</body>
+</html>
